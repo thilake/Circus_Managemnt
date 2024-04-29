@@ -1,0 +1,305 @@
+--Drop existing tables if they exist
+DROP TABLE IF EXISTS ActEquipment CASCADE;
+DROP TABLE IF EXISTS Maintenance CASCADE;
+DROP TABLE IF EXISTS ActPerformers CASCADE;
+DROP TABLE IF EXISTS Animal CASCADE;
+DROP TABLE IF EXISTS Performers CASCADE;
+DROP TABLE IF EXISTS OrderDetails CASCADE;
+DROP TABLE IF EXISTS Ticket CASCADE;
+DROP TABLE IF EXISTS ShowActs CASCADE;
+DROP TABLE IF EXISTS TicketSales CASCADE;
+DROP TABLE IF EXISTS Act CASCADE;
+DROP TABLE IF EXISTS Show CASCADE;
+DROP TABLE IF EXISTS Customer CASCADE;
+DROP TABLE IF EXISTS Performers_Review CASCADE;
+
+DROP VIEW IF EXISTS TicketSalesView;
+DROP VIEW IF EXISTS ShowPerformersView;
+
+--Creating tables
+
+CREATE TABLE Customer (
+    CustomerID SERIAL CONSTRAINT pk_Customer PRIMARY KEY,
+    FirstName VARCHAR(50) NOT NULL,
+    LastName VARCHAR(50) NOT NULL,
+    Email VARCHAR(100),
+    PhoneNumber VARCHAR(20),
+    LoyaltyPoints INT DEFAULT 0  
+);
+
+CREATE TABLE Show (
+    ShowID SERIAL CONSTRAINT pk_Show PRIMARY KEY,
+    ShowName VARCHAR(100) NOT NULL,
+    ShowDate DATE NOT NULL,
+    Venue VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE Act (
+    ActID SERIAL CONSTRAINT pk_Act PRIMARY KEY,
+    ActName VARCHAR(100) NOT NULL,
+    ActDescription TEXT,
+    ActDuration TIME,
+    CostumesRequired BOOLEAN
+);
+
+CREATE TABLE ShowActs (
+    ShowID INT,
+    ActID INT,
+    ActSequence INT,
+    AudienceCapacity INT CHECK (AudienceCapacity >= 0),
+    Manager VARCHAR(100),
+    PRIMARY KEY (ShowID, ActID),
+    CONSTRAINT fk_ShowID FOREIGN KEY (ShowID) REFERENCES Show(ShowID) ON DELETE CASCADE,
+    CONSTRAINT fk_ActID FOREIGN KEY (ActID) REFERENCES Act(ActID) ON DELETE CASCADE
+);
+
+CREATE TABLE TicketSales (
+    ShowID INT,
+    Month INT CHECK (Month >= 1 AND Month <= 12),
+    Year INT CHECK (Year > 0),
+    TicketsSold INT CHECK (TicketsSold >= 0),
+    TotalRevenue NUMERIC(12, 2) CHECK (TotalRevenue >= 0),
+    PRIMARY KEY (ShowID, Month, Year),
+    CONSTRAINT fk_ShowID FOREIGN KEY (ShowID) REFERENCES Show(ShowID) ON DELETE CASCADE);
+
+CREATE TABLE Ticket (
+    TicketID SERIAL CONSTRAINT pk_Ticket PRIMARY KEY,
+    ShowID INT,
+    TicketType VARCHAR(50) NOT NULL,
+    Price NUMERIC(8, 2) CHECK (Price >= 0),
+    SeatNumber VARCHAR(10),
+    DateOfSale DATE DEFAULT CURRENT_DATE,
+    CONSTRAINT fk_ShowID FOREIGN KEY (ShowID) REFERENCES Show(ShowID) ON DELETE CASCADE
+);
+
+CREATE TABLE OrderDetails (
+    OrderID SERIAL CONSTRAINT pk_OrderDetails PRIMARY KEY,
+    TicketID INT CONSTRAINT fk_TicketID REFERENCES Ticket(TicketID) ON DELETE RESTRICT,
+    CustomerID INT CONSTRAINT fk_CustomerID REFERENCES Customer(CustomerID) ON DELETE RESTRICT,
+    Quantity INT CHECK (Quantity > 0),
+    PaymentMethod VARCHAR(50) NOT NULL);
+
+CREATE TABLE Performers (
+    PerformerID SERIAL CONSTRAINT pk_Performers PRIMARY KEY,
+    FirstName VARCHAR(50) NOT NULL,
+    LastName VARCHAR(50) NOT NULL,
+    DateOfBirth DATE CHECK (DateOfBirth <= CURRENT_DATE),
+    PhoneNumber VARCHAR(20),
+    BloodGroup VARCHAR(5),
+    PerformanceSchedule VARCHAR(100),
+    HireDate DATE CHECK (HireDate <= CURRENT_DATE),
+    TrainerID INT REFERENCES Performers(PerformerID) -- Self-referencing column
+);
+
+CREATE TABLE Performers_Review (
+    CustomerID INT,
+    PerformerID INT,
+    PerformanceDate DATE,
+    Rating NUMERIC(2, 1) CHECK (Rating >= 0 AND Rating <= 5),
+    Comments TEXT,
+    CONSTRAINT pk_Performers_Review PRIMARY KEY (CustomerID),
+    CONSTRAINT fk_CustomerID FOREIGN KEY (CustomerID) REFERENCES Customer(CustomerID) ON DELETE CASCADE,
+    CONSTRAINT fk_PerformerID FOREIGN KEY (PerformerID) REFERENCES Performers(PerformerID) ON DELETE CASCADE);
+
+CREATE TABLE Animal (
+    AnimalID SERIAL CONSTRAINT pk_Animal PRIMARY KEY,
+    TrainerID INT CONSTRAINT fk_TrainerID REFERENCES Performers(PerformerID) ON DELETE CASCADE,
+    AnimalName VARCHAR(50) NOT NULL,
+    Gender CHAR(1),
+    Species VARCHAR(50),
+    Origin VARCHAR(50),
+    BirthYear INT,
+    BirthMonth INT CHECK (BirthMonth >= 1 AND BirthMonth <= 12),
+    HealthStatus VARCHAR(50),
+    DeathYear INT,
+    DeathMonth INT CHECK (DeathMonth >= 1 AND DeathMonth <= 12));
+
+CREATE TABLE ActPerformers (
+    ActID INT,
+    PerformerID INT,
+    Role VARCHAR(50),
+    CONSTRAINT fk_ActID FOREIGN KEY (ActID) REFERENCES Act(ActID) ON DELETE CASCADE,
+    CONSTRAINT fk_PerformerID FOREIGN KEY (PerformerID) REFERENCES Performers(PerformerID) ON DELETE CASCADE,
+    PRIMARY KEY (ActID, PerformerID)
+);
+
+CREATE TABLE ActEquipment (
+    ActID INT,
+    EquipmentID INT NOT NULL,
+    UsageDescription TEXT,
+    CONSTRAINT fk_ActID FOREIGN KEY (ActID) REFERENCES Act(ActID) ON DELETE CASCADE,
+    PRIMARY KEY (ActID, EquipmentID)
+);
+
+CREATE TABLE Maintenance (
+    EquipmentID SERIAL CONSTRAINT pk_Maintenance PRIMARY KEY,
+    PurchaseYear INT CHECK (PurchaseYear > 0),
+    PurchaseMonth INT CHECK (PurchaseMonth >= 1 AND PurchaseMonth <= 12),
+    PurchaseCost NUMERIC(10, 2) CHECK (PurchaseCost >= 0),
+    Damaged BOOLEAN,
+    Comments TEXT);
+
+--View for TicketSales
+
+CREATE VIEW TicketSalesView AS
+SELECT
+    s.ShowID,s.ShowName,s.ShowDate,ts.Month,ts.Year,ts.Ticketssold,ts.TotalRevenue
+FROM Show s
+JOIN TicketSales ts ON s.ShowID = ts.ShowID;
+
+CREATE VIEW ShowPerformersView AS
+SELECT
+    s.ShowName,s.ShowDate,s.Venue,a.ActName,a.ActDescription,a.ActDuration,ap.Role,
+    CONCAT(p.FirstName, ' ', p.LastName) AS PerformerName,p.PerformanceSchedule
+FROM
+    ShowActs sa
+JOIN
+    Show s ON sa.ShowID = s.ShowID
+JOIN
+    Act a ON sa.ActID = a.ActID
+JOIN
+    ActPerformers ap ON a.ActID = ap.ActID
+JOIN
+    Performers p ON ap.PerformerID = p.PerformerID;
+
+
+--Insert sample data
+
+INSERT INTO Customer (FirstName, LastName, Email, PhoneNUmber,LoyaltyPoints)
+VALUES
+    ('Alice', 'Williams', 'alice.williams@example.com', '1234567890',45),
+    ('Thilak', 'Johnson', 'bob.johnson@example.com', '9876543210',33),
+    ('Charlie', 'Davis', 'charlie.davis@example.com', '5555555555',992),
+    ('Emily', 'Brown', 'emily.brown@example.com', '7777777777',120),
+    ('Michael', 'Wilson', 'michael.wilson@example.com', '8888888888',440),
+    ('Sophia', 'Taylor', 'sophia.taylor@example.com', '9999999999',800),
+    ('David', 'Anderson', 'david.anderson@example.com', '1111111111',500),
+    ('Olivia', 'Thomas', 'olivia.thomas@example.com', '2222222222',900);
+
+INSERT INTO Show (ShowName, ShowDate, Venue)
+VALUES
+    ('Circus Spectacular', '2023-06-01', 'Main Arena'),
+    ('Magic Night', '2023-07-15', 'Theatre Hall'),
+    ('Family Fun Day', '2023-08-20', 'Outdoor Stage'),
+    ('Spring Circus', '2024-03-15', 'Main Arena'),
+    ('Summer Extravaganza', '2024-07-20', 'Outdoor Stage'),
+    ('Winter Wonderland', '2024-12-10', 'Theatre Hall'),
+    ('Autumn Festival', '2024-09-25', 'Outdoor Stage'),
+    ('Holiday Magic', '2024-12-25', 'Theatre Hall');
+
+INSERT INTO Act (ActName, ActDescription, ActDuration, CostumesRequired)
+VALUES
+    ('Acrobatic Show', 'A thrilling display of acrobatic performances', '01:30:00', true),
+    ('Magic Show', 'An evening of illusions and magic tricks', '02:00:00', false),
+    ('Clown Act', 'Hilarious clown performances for all ages', '01:00:00', true),
+    ('Fire Breathing Performance', 'A thrilling display of fire breathing stunts', '01:15:00', true),
+    ('Animal Parade', 'A delightful parade of trained animals', '01:45:00', true),
+    ('Juggling Show', 'An amazing display of juggling skills', '01:30:00', true),
+    ('Music Concert', 'A lively concert featuring various artists', '02:30:00', true),
+    ('Dance Performance', 'An energetic dance extravaganza', '01:45:00', true);
+
+INSERT INTO Performers (FirstName, LastName, DateofBirth, PhoneNumber, BloodGroup, PerformanceSchedule, HireDate,TrainerID)
+VALUES
+    ('John', 'Doe', '1990-05-15', '1234567890', 'A+', 'Weekends', '2018-01-01',2),
+    ('Jane', 'Smith', '1985-10-20', '9876543210', 'O-', 'Weekdays', '2016-03-15',NULL),
+    ('Bob', 'Johnson', '1988-07-01', '5555555555', 'AB+', 'Weekends', '2020-06-01',4),
+    ('Thilak', 'Singh', '1992-08-10', '6666666666', 'B+', 'Weekdays', '2022-01-10',NULL), 
+    ('James', 'Miller', '1991-12-05', '7777777777', 'A-', 'Weekends', '2023-04-01',2),
+    ('Raj', 'Kumar', '1989-09-15', '8888888888', 'O-', 'Varies', '2021-05-20',NULL),
+    ('Koki', 'Kumar', '1995-03-25', '9999999999', 'B-', 'Weekdays', '2022-09-10', 8),
+    ('Veera', 'Ragavan', '1993-11-18', '1010101010', 'AB-', 'Weekends', '2020-11-05', NULL);
+
+
+INSERT INTO Animal (TrainerID, AnimalName, Gender, Species, Origin, BirthYear, BirthMonth, HealthStatus, DeathYear, DeathMonth)
+VALUES
+    (1, 'Buddy', 'M', 'Dog', 'United States', 2015, 5, 'Healthy', NULL, NULL),
+    (1, 'Daisy', 'F', 'Elephant', 'India', 2010, 8, 'Healthy', NULL, NULL),
+    (2, 'Leo', 'M', 'Lion', 'Africa', 2011, 9, 'Dead', 2020, 9),
+    (3, 'Max', 'M', 'Tiger', 'India', 2012, 7, 'Healthy', NULL, NULL),
+    (2, 'Scooby', 'M', 'Bear', 'Canada', 2013, 10, 'Healthy', NULL, NULL),
+    (4, 'Luna', 'F', 'Giraffe', 'Africa', 2014, 4, 'Healthy', NULL, NULL),
+    (1, 'Rocky', 'M', 'Gorilla', 'Africa', 2016, 6, 'Healthy', NULL, NULL),
+    (8, 'Lily', 'F', 'Panda', 'China', 2015, 11, 'Healthy', NULL, NULL);
+
+INSERT INTO ShowActs (ShowID, ActID, ActSequence, AudienceCapacity, Manager)
+VALUES
+    (1, 1, 1, 800, 'John Doe'),
+    (1, 2, 2, 800, 'John Doe'),
+    (1, 3, 3, 800, 'John Doe'),
+    (2, 2, 1, 600, 'Jane Smith'),
+    (2, 3, 2, 600, 'Jane Smith'),
+    (3, 1, 1, 1000,'Emily Clark'),
+    (4, 4, 1, 1200, 'Thilak Raj'),
+    (5, 5, 1, 1500, 'Rajesh Raj');
+INSERT INTO TicketSales (ShowID, Month, Year, TicketsSold,TotalRevenue)
+VALUES
+    (1, 6, 2023, 800, 20000.00),
+    (1, 7, 2023, 450, 15000.00),
+    (2, 7, 2023, 300, 18000.00),
+    (2, 8, 2023, 600, 12000.00),
+    (3, 8, 2023, 550, 25000.00),
+    (3, 9, 2023, 1000,23000.00),
+    (4, 10, 2023, 700, 28000.00),
+    (5, 11, 2023, 900, 35000.00);
+
+INSERT INTO Ticket (ShowID, TicketType, Price, SeatNumber, DateofSale)
+VALUES
+    (1, 'VIP', 120.00, 'A1', '2023-05-25'),
+    (1, 'Regular', 80.00, 'B10', '2023-05-26'),
+    (2, 'VIP', 150.00, 'A1', '2023-07-10'),
+    (2, 'Regular', 100.00, 'C15', '2023-07-11'),
+    (3, 'VIP', 130.00, 'D1', '2023-08-15'),
+    (3, 'Regular', 90.00, 'E10', '2023-08-16'),
+    (4, 'VIP', 140.00, 'F1', '2023-09-20'),
+    (4, 'Regular', 95.00, 'G10', '2023-09-21');
+INSERT INTO OrderDetails (TicketID, CustomerID, Quantity, PaymentMethod)
+VALUES
+    (1, 1, 2, 'Credit Card'),
+    (2, 2, 4, 'Debit Card'),
+    (3, 3, 1, 'PayPal'),
+    (4, 4, 3, 'Credit Card'),
+    (5, 5, 2, 'Cash'),
+    (6, 6, 2, 'Credit Card'),
+    (7, 7, 5, 'Cash'),
+    (8, 8, 1, 'Debit Card');
+INSERT INTO Performers_Review (CustomerID, PerformerID, PerformanceDate, Rating, Comments)
+VALUES
+    (1, 2, '2023-06-01', 4.8, 'Absolutely thrilling!'),
+    (2, 4, '2023-07-15', 4.6, 'A magical experience.'),
+    (3, 6, '2023-08-20', 4.7, 'Very entertaining, loved it.'),
+    (4, 2, '2023-06-02', 4.9, 'The best acrobat ever!'),
+    (5, 2, '2023-07-16', 4.2, 'Good show but a bit short.'), 
+    (6, 6, '2023-08-21', 4.5, 'Kids had a fantastic time!'),
+    (7, 1, '2023-09-10', 4.3, 'Great performance, but could improve.'),
+    (8, 6, '2023-09-15', 4.6, 'Entertaining for the whole family!');
+INSERT INTO ActPerformers (ActID, PerformerID, Role)
+VALUES
+    (1, 2, 'Lead Acrobat'),
+    (2, 1, 'Main Magician'),
+    (3, 5, 'Primary Clown'),
+    (1, 3, 'Supporting Acrobat'), 
+    (2, 4, 'Assistant Magician'),
+    (3, 6, 'Backup Clown'),
+    (4, 8, 'Fire Breather'),
+    (5, 7, 'substitute performer');
+
+INSERT INTO ActEquipment (ActID, EquipmentID, UsageDescription)
+VALUES
+    (1, 101, 'Safety Nets'),
+    (2, 102, 'Magic Props'),
+    (3, 103, 'Juggling Balls'),
+    (1, 104, 'Trapeze Rigs'),
+    (2, 105, 'Illusion Boxes'),
+    (3, 106, 'Unicycles'),
+    (4, 107, 'Fire Rings'),
+    (5, 108, 'Animal Costumes');
+INSERT INTO Maintenance (EquipmentID, PurchaseYear, PurchaseMonth, PurchaseCost, Damaged, Comments)
+VALUES
+    (101, 2022, 1, 3000.00, false, 'Regular checks, all good.'),
+    (102, 2021, 4, 1500.00, false, 'Well maintained.'),
+    (103, 2020, 7, 500.00, true, 'Minor damage, repaired.'),
+    (104, 2023, 2, 2000.00, false, 'New, excellent condition.'),
+    (105, 2022, 5, 2500.00, false, 'No issues reported.'),
+    (106, 2021, 3, 800.00, true, 'Needs new tires.'),
+    (107, 2024, 4, 1200.00, true, 'Requires maintenance for damaged parts.'),
+    (108, 2023, 10, 1800.00, false, 'Recently serviced, in good condition.');
