@@ -6,5 +6,6 @@ The real-world domain represented by this database is the circus industry, which
 
 It captures the details of the shows, acts, performers (both human and animal), schedules, venues, ticket pricing and sales, customer data, and the necessary equipment and logistics behind staging successful circus performances while tracking the financial aspects of the circus operation.
 
-This ERD well describes a circus Database.
+This ERD well describes a circus Database:
+
 ![image](https://github.com/thilake/Circus_Managemnt/assets/53141223/f8882829-c84a-4cdb-b2ee-c947be7b2844)
